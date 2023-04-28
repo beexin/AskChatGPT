@@ -9,7 +9,7 @@ Access OpenAI's **ChatGPT** API from <a href="https://www.embarcadero.com/es/pro
 ### Features
 - Access GPT API from a single class, simple and easily
 - Supports GPT3 and GPT4 models
-- Can read API key from `ChatGPTApiKey` if defined 
+- Can read API key from `ChatGPTApiKey` environment variable if defined 
 - Will attempt to sanitize input to minimize errors
 
 ### Coming Features
