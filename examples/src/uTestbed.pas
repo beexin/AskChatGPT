@@ -166,15 +166,85 @@ begin
 end;
 
 procedure Test04;
+var
+  LChat: TAskChatGPT;
+  LQuestion: TStringList;
+  LPrompt, LResponse: string;
+  LDone: Boolean;
 begin
+  // create question context list
+  LQuestion := TStringList.Create;
+  try
 
+    // create chat
+    LChat := TAskChatGPT.Create;
+    try
+      // set the GPT model
+      LChat.Model := GPT3;
+      LChat.Question := '';
+
+      // display intro
+      PrintLn('Welcome to AskChatGPT', []);
+      PrintLn('  Press "q" or "quit" to exit.', []);
+      PrintLn('', []);
+
+      // reset done flag
+      LDone := False;
+      repeat
+
+        // display prompt
+        Print(CRLF+'Q: ', []);
+        ReadLn(LPrompt);
+
+        // check if time to quit
+        if (LPrompt = 'q') or (LPrompt = 'quit') then
+          begin
+            LDone := True;
+          end
+        // process the prompt
+        else if not LPrompt.IsEmpty then
+          begin
+            // add prompt to context
+            LQuestion.Add(LPrompt);
+
+            // add context to chat
+            LChat.Question := LQuestion.Text;
+
+            // wait for a response
+            if LChat.Process then
+            begin
+              // process the response
+              LResponse := LChat.Response;
+
+              // if there are no errors, add response to context
+              if not LResponse.StartsWith('Error', True) then
+                LQuestion.Add(' ' + LResponse);
+
+              // display response
+              PrintLn(CRLF+'A: %s', [LResponse]);
+            end;
+          end;
+
+      // loop until done flag is true
+      until LDone;
+    finally
+      // free chat
+      LChat.Free;
+    end;
+  finally
+    // free question
+    LQuestion.Free;
+  end;
+
+  Pause;
 end;
 
 procedure RunTests;
 begin
   //Test01;
   //Test02;
-  Test03;
+  //Test03;
+  Test04;
 end;
 
 end.
