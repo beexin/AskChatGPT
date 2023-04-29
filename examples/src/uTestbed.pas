@@ -205,7 +205,7 @@ begin
         else if not LPrompt.IsEmpty then
           begin
             // add prompt to context
-            LQuestion.Add(LPrompt);
+            LQuestion.Add(' ' + LPrompt);
 
             // add context to chat
             LChat.Question := LQuestion.Text;

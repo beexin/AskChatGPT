@@ -166,9 +166,9 @@ begin
   LQuestion := LQuestion.Trim;
 
   // remove invalid characters
-  LQuestion := LQuestion.Replace(#0, '');
-  LQuestion := LQuestion.Replace(CR, '');
-  LQuestion := LQuestion.Replace(LF, '');
+  LQuestion := LQuestion.Replace(#0, ' ');
+  LQuestion := LQuestion.Replace(CR, ' ');
+  LQuestion := LQuestion.Replace(LF, ' ');
 
   // save question
   FQuestion := LQuestion;
@@ -214,80 +214,89 @@ begin
   // set response string to empty
   FResponse := '';
 
-  // create http client
-  LHttpClient := TNetHTTPClient.Create(nil);
   try
-    // init customer headers
-    LHttpClient.CustomHeaders['Authorization'] := 'Bearer ' + FApiKey;
-    LHttpClient.CustomHeaders['Content-Type'] := 'application/json';
-
-    // create Json object
-    LJson := TJsonObject.Create;
+    // create http client
+    LHttpClient := TNetHTTPClient.Create(nil);
     try
+      // init customer headers
+      LHttpClient.CustomHeaders['Authorization'] := 'Bearer ' + FApiKey;
+      LHttpClient.CustomHeaders['Content-Type'] := 'application/json';
 
-      // create Json message array object
-      LMessages := TJsonArray.Create;
+      // create Json object
+      LJson := TJsonObject.Create;
       try
 
-        // create Json message object
-        LMessage := TJsonObject.Create;
+        // create Json message array object
+        LMessages := TJsonArray.Create;
         try
-          // set api role
-          LMessage.AddPair('role', 'user');
 
-          // set api content
-          LMessage.AddPair('content', FQuestion);
-          LMessages.Add(LMessage.Clone as TJsonObject);
+          // create Json message object
+          LMessage := TJsonObject.Create;
+          try
+            // set api role
+            LMessage.AddPair('role', 'user');
+
+            // set api content
+            LMessage.AddPair('content', FQuestion);
+            LMessages.Add(LMessage.Clone as TJsonObject);
+          finally
+            LMessage.Free;
+          end;
+          // set api model
+          LJson.AddPair('model', cModel[FModel]);
+
+          // set api message
+          LJson.AddPair('messages', LMessages.Clone as TJsonArray);
+
+          // get Json string
+          LString := LJson.ToString;
         finally
-          LMessage.Free;
+          LMessages.Free;
         end;
-        // set api model
-        LJson.AddPair('model', cModel[FModel]);
-
-        // set api message
-        LJson.AddPair('messages', LMessages.Clone as TJsonArray);
-
-        // get Json string
-        LString := LJson.ToString;
       finally
-        LMessages.Free;
+        LJson.Free;
+      end;
+
+      // create post data stream
+      LPostDataStream := TStringStream.Create(LString, TEncoding.UTF8);
+      try
+        // post data to GPT api and get response string
+        LPostDataStream.Position := 0;
+        LResponse := LHttpClient.Post('https://api.openai.com/v1/chat/completions', LPostDataStream);
+        LString := LResponse.ContentAsString;
+      finally
+        LPostDataStream.Free;
+      end;
+
+      // create Json object from response string
+      LJson := TJsonObject.ParseJSONValue(LString) as TJsonObject;
+      try
+        // if success get response message
+        if LResponse.StatusCode = 200 then
+          begin
+            FResponse := LJson.P['choices[0].message.content'].Value;
+          end
+        else
+          // otherwise get response error
+          begin
+            if LJSon.FindValue('error.message') <> nil then
+              FResponse := 'Error: ' + LJson.P['error.message'].Value
+            else
+              begin
+                FResponse := Format('Error: HTTP response code %d: %s', [LResponse.StatusCode, LResponse.StatusText]);
+              end;
+          end;
+      finally
+        // free Json object
+        LJson.Free;
       end;
     finally
-      LJson.Free;
+      // free httpclient object
+      LHttpClient.Free;
     end;
-
-    // create post data stream
-    LPostDataStream := TStringStream.Create(LString, TEncoding.UTF8);
-    try
-      // post data to GPT api and get response string
-      LPostDataStream.Position := 0;
-      LResponse := LHttpClient.Post('https://api.openai.com/v1/chat/completions', LPostDataStream);
-      LString := LResponse.ContentAsString;
-    finally
-      LPostDataStream.Free;
-    end;
-
-    // create Json object from response string
-    LJson := TJsonObject.ParseJSONValue(LString) as TJsonObject;
-    try
-      // if success get response message
-      if LResponse.StatusCode = 200 then
-        begin
-          FResponse := LJson.P['choices[0].message.content'].Value;
-        end
-      else
-        // otherwise get response error
-        begin
-          FResponse := 'Error: ' + LJson.P['error.message'].Value;
-        end;
-    finally
-      // free Json object
-      LJson.Free;
-    end;
-  finally
-
-    // free httpclient object
-    LHttpClient.Free;
+  except
+    on E: Exception do
+      FResponse := Format('Error: %s', [E.Message]);
   end;
 
   // indicate there was a response
